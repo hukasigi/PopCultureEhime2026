@@ -95,12 +95,15 @@ void loop() {
         last += CONTROL_CYCLE;
         double dt = CONTROL_CYCLE / 1e6;
 
-        double vx = PS4.LStickX() / 128.0 * 0.5;
-        double vy = PS4.LStickY() / 128.0 * 0.5;
-        double w  = PS4.RStickX() / 128.0 * 3.0;
-        if (abs(vx) < 0.05) vx = 0;
-        if (abs(vy) < 0.05) vy = 0;
-        if (abs(w) < 0.3) w = 0;
+        double target_vx    = PS4.LStickX() / 128.0 * 0.5;
+        double target_vy    = PS4.LStickY() / 128.0 * 0.5;
+        double target_omega = PS4.RStickX() / 128.0 * 3.0;
+
+        const double DEADZONE_V     = 0.05;
+        const double DEADZONE_OMEGA = 0.3;
+        if (abs(target_vx) < DEADZONE_V) target_vx = 0;
+        if (abs(target_vy) < DEADZONE_V) target_vy = 0;
+        if (abs(target_omega) < DEADZONE_OMEGA) target_omega = 0;
 
         enc_count1 = enc1.getCount();
         enc_count2 = enc2.getCount();
@@ -119,9 +122,12 @@ void loop() {
         double wheelSpeed3 = pulseToRad(deltaCount3) / dt;
 
         // 逆運動学、
-        double targetOmega1 = (-sin(WHEEL_ANGLE1) * vx + cos(WHEEL_ANGLE1) * vy + ROBOT_RADIUS * w) / WHEEL_RADIUS;
-        double targetOmega2 = (-sin(WHEEL_ANGLE2) * vx + cos(WHEEL_ANGLE2) * vy + ROBOT_RADIUS * w) / WHEEL_RADIUS;
-        double targetOmega3 = (-sin(WHEEL_ANGLE3) * vx + cos(WHEEL_ANGLE3) * vy + ROBOT_RADIUS * w) / WHEEL_RADIUS;
+        double targetOmega1 =
+            (-sin(WHEEL_ANGLE1) * target_vx + cos(WHEEL_ANGLE1) * target_vy + ROBOT_RADIUS * target_omega) / WHEEL_RADIUS;
+        double targetOmega2 =
+            (-sin(WHEEL_ANGLE2) * target_vx + cos(WHEEL_ANGLE2) * target_vy + ROBOT_RADIUS * target_omega) / WHEEL_RADIUS;
+        double targetOmega3 =
+            (-sin(WHEEL_ANGLE3) * target_vx + cos(WHEEL_ANGLE3) * target_vy + ROBOT_RADIUS * target_omega) / WHEEL_RADIUS;
 
         double pwm1 = pid1.update(targetOmega1, wheelSpeed1, dt);
         double pwm2 = pid2.update(targetOmega2, wheelSpeed2, dt);

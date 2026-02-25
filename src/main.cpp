@@ -37,7 +37,7 @@ static unsigned long last;
 
 constexpr int8_t MOTOR1_CH = 0;
 constexpr int8_t MOTOR2_CH = 1;
-constexpr int8_t MOTOR3_CH = 3;
+constexpr int8_t MOTOR3_CH = 2;
 
 // radに変換
 constexpr double WHEEL_ANGLE1 = 0. * PI / 180.;

@@ -33,8 +33,8 @@ const double RESOLUTION    = 4096.;
 constexpr double ROBOT_RADIUS = 0.3;
 constexpr double WHEEL_RADIUS = 0.05;
 
-constexpr double MAXIMUM_TRANSLATIONAL_VELOCITY = 4.;
-constexpr double MAXIMUM_ROTATIONAL_SPEED       = 5.;
+constexpr double MAXIMUM_TRANSLATIONAL_SPEED = 4.;
+constexpr double MAXIMUM_ROTATIONAL_SPEED    = 5.;
 
 static unsigned long last;
 
@@ -52,6 +52,13 @@ long prev1 = 0, prev2 = 0, prev3 = 0;
 SpeedPID pid1(5.0, 0.0, 0.05, -255, 255);
 SpeedPID pid2(5.0, 0.0, 0.05, -255, 255);
 SpeedPID pid3(5.0, 0.0, 0.05, -255, 255);
+
+double pos_x     = 0;
+double pos_y     = 0;
+double pos_theta = 0;
+
+static bool   moveCommand = false;
+static double target_x, target_y;
 
 double pulseToRad(long deltaCount) {
     return (double(deltaCount) / RESOLUTION) * 2.0 * PI;
@@ -87,6 +94,8 @@ void setup() {
     pinMode(PIN_DIR_1, OUTPUT);
     pinMode(PIN_DIR_2, OUTPUT);
     pinMode(PIN_DIR_3, OUTPUT);
+
+    last = micros();
 }
 
 void loop() {
@@ -107,9 +116,43 @@ void loop() {
         if (abs(ly) < STICK_DEADZONE) ly = 0;
         if (abs(rx) < STICK_DEADZONE) rx = 0;
 
-        double target_vx    = lx / 128.0 * MAXIMUM_TRANSLATIONAL_VELOCITY;
-        double target_vy    = ly / 128.0 * MAXIMUM_TRANSLATIONAL_VELOCITY;
+        double target_vx    = lx / 128.0 * MAXIMUM_TRANSLATIONAL_SPEED;
+        double target_vy    = ly / 128.0 * MAXIMUM_TRANSLATIONAL_SPEED;
         double target_omega = rx / 128.0 * MAXIMUM_ROTATIONAL_SPEED;
+
+        static bool prevCircle = false;
+        bool        circleNow  = PS4.Circle();
+
+        if (circleNow && !prevCircle) {
+            moveCommand = true;
+            target_x    = pos_x + cos(pos_theta) * 1.0;
+            target_y    = pos_y + sin(pos_theta) * 1.0;
+        }
+        prevCircle = circleNow;
+
+        if (moveCommand) {
+            double error_x = target_x - pos_x;
+            double error_y = target_y - pos_y;
+
+            double Kp_pos = 2.0;
+
+            double error_robot_x = cos(pos_theta) * error_x + sin(pos_theta) * error_y;
+            double error_robot_y = -sin(pos_theta) * error_x + cos(pos_theta) * error_y;
+
+            target_vx    = Kp_pos * error_robot_x;
+            target_vy    = Kp_pos * error_robot_y;
+            target_omega = 0;
+
+            target_vx = constrain(target_vx, -1.0, 1.0);
+            target_vy = constrain(target_vy, -1.0, 1.0);
+
+            // 目標に近づいたら停止
+            if (sqrt(error_x * error_x + error_y * error_y) < 0.02) {
+                moveCommand = false;
+                target_vx   = 0;
+                target_vy   = 0;
+            }
+        }
 
         enc_count1 = enc1.getCount();
         enc_count2 = enc2.getCount();
@@ -128,7 +171,8 @@ void loop() {
         double wheelSpeed2 = pulseToRad(deltaCount2) / dt;
         double wheelSpeed3 = pulseToRad(deltaCount3) / dt;
 
-        // 逆運動学、
+        // 逆運動学、それぞれのホイールの角速度
+        // 線速度 m/s から、角速度 rad/sに変換
         double targetOmega1 =
             (-sin(WHEEL_ANGLE1) * target_vx + cos(WHEEL_ANGLE1) * target_vy + ROBOT_RADIUS * target_omega) / WHEEL_RADIUS;
         double targetOmega2 =
@@ -136,15 +180,25 @@ void loop() {
         double targetOmega3 =
             (-sin(WHEEL_ANGLE3) * target_vx + cos(WHEEL_ANGLE3) * target_vy + ROBOT_RADIUS * target_omega) / WHEEL_RADIUS;
 
+        // 順運動学、ロボット速度推定
+        // すべてのx方向の角速度の総量を取り、それを線速度に変換 /3 で平均
+        double vx = (-sin(WHEEL_ANGLE1) * wheelSpeed1 - sin(WHEEL_ANGLE2) * wheelSpeed2 - sin(WHEEL_ANGLE3) * wheelSpeed3) *
+                    WHEEL_RADIUS / 3.0;
+
+        double vy = (cos(WHEEL_ANGLE1) * wheelSpeed1 + cos(WHEEL_ANGLE2) * wheelSpeed2 + cos(WHEEL_ANGLE3) * wheelSpeed3) *
+                    WHEEL_RADIUS / 3.0;
+
+        double omega = (wheelSpeed1 + wheelSpeed2 + wheelSpeed3) * WHEEL_RADIUS / (3.0 * ROBOT_RADIUS);
+
+        pos_x += (cos(pos_theta) * vx - sin(pos_theta) * vy) * dt;
+        pos_y += (sin(pos_theta) * vx + cos(pos_theta) * vy) * dt;
+        pos_theta += omega * dt;
+
         double pwm1 = pid1.update(targetOmega1, wheelSpeed1, dt);
         double pwm2 = pid2.update(targetOmega2, wheelSpeed2, dt);
         double pwm3 = pid3.update(targetOmega3, wheelSpeed3, dt);
 
-        setMotor(MOTOR1_CH, PIN_DIR_1, pwm1);
-        setMotor(MOTOR2_CH, PIN_DIR_2, pwm2);
-        setMotor(MOTOR3_CH, PIN_DIR_3, pwm3);
-
-        if (target_vx == 0 && target_vy == 0 && target_omega == 0) {
+        if (fabs(target_vx) < 0.001 && fabs(target_vy) < 0.001 && fabs(target_omega) < 0.001) {
             pwm1 = 0;
             pwm2 = 0;
             pwm3 = 0;
@@ -152,5 +206,9 @@ void loop() {
             pid2.reset();
             pid3.reset();
         }
+
+        setMotor(MOTOR1_CH, PIN_DIR_1, pwm1);
+        setMotor(MOTOR2_CH, PIN_DIR_2, pwm2);
+        setMotor(MOTOR3_CH, PIN_DIR_3, pwm3);
     }
 }

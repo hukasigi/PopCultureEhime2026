@@ -1,7 +1,7 @@
 #pragma once
 #include <Arduino.h>
 
-class Speed {
+class AnglePID {
     private:
         double kp, ki, kd;
         double out_min, out_max;
@@ -13,7 +13,7 @@ class Speed {
         double integral_min;
 
     public:
-        Speed(double kp, double ki, double kd, double out_min, double out_max, double range, double INTEGRAL_MAX,
+        AnglePID(double kp, double ki, double kd, double out_min, double out_max, double range, double INTEGRAL_MAX,
               double INTEGRAL_MIN)
             : kp(kp), ki(ki), kd(kd), out_min(out_min), out_max(out_max), range(range), integral_max(INTEGRAL_MAX),
               integral_min(INTEGRAL_MIN), prev_error(0.0), control(0.0), integral(0.0) {}

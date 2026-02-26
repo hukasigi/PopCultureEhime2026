@@ -31,7 +31,10 @@ const int    CONTROL_CYCLE = 5000;
 const double RESOLUTION    = 4096.;
 
 constexpr double ROBOT_RADIUS = 0.3;
-constexpr double WHEEL_RADIUS = 0.10;
+constexpr double WHEEL_RADIUS = 0.05;
+
+constexpr double MAXIMUM_TRANSLATIONAL_VELOCITY = 4.;
+constexpr double MAXIMUM_ROTATIONAL_SPEED       = 5.;
 
 static unsigned long last;
 
@@ -46,9 +49,9 @@ constexpr double WHEEL_ANGLE3 = 240. * PI / 180.;
 
 long prev1 = 0, prev2 = 0, prev3 = 0;
 
-SpeedPID pid1(1.0, 0.3, 0.0, -255, 255);
-SpeedPID pid2(1.0, 0.3, 0.0, -255, 255);
-SpeedPID pid3(1.0, 0.3, 0.0, -255, 255);
+SpeedPID pid1(5.0, 0.0, 0.05, -255, 255);
+SpeedPID pid2(5.0, 0.0, 0.05, -255, 255);
+SpeedPID pid3(5.0, 0.0, 0.05, -255, 255);
 
 double pulseToRad(long deltaCount) {
     return (double(deltaCount) / RESOLUTION) * 2.0 * PI;
@@ -63,8 +66,7 @@ void setMotor(int8_t ch, int8_t dirPin, double pwm) {
 
 void setup() {
     Serial.begin(115200);
-    PS4.begin("");
-
+    PS4.begin("48:e7:29:a3:c5:0e");
     ESP32Encoder::useInternalWeakPullResistors = puType::none;
     enc1.attachHalfQuad(PIN_ROTARY_A_1, PIN_ROTARY_B_1);
     enc2.attachHalfQuad(PIN_ROTARY_A_2, PIN_ROTARY_B_2);
@@ -91,19 +93,23 @@ void loop() {
     unsigned long now = micros();
 
     if (now - last >= CONTROL_CYCLE) {
-        long enc_count1, enc_count2, enc_count3;
-        last += CONTROL_CYCLE;
-        double dt = CONTROL_CYCLE / 1e6;
+        long   enc_count1, enc_count2, enc_count3;
+        double dt = (now - last) / 1e6;
+        last      = now;
 
-        double target_vx    = PS4.LStickX() / 128.0 * 0.5;
-        double target_vy    = PS4.LStickY() / 128.0 * 0.5;
-        double target_omega = PS4.RStickX() / 128.0 * 3.0;
+        int lx = PS4.LStickX();
+        int ly = PS4.LStickY();
+        int rx = PS4.RStickX();
 
-        const double DEADZONE_V     = 0.05;
-        const double DEADZONE_OMEGA = 0.3;
-        if (abs(target_vx) < DEADZONE_V) target_vx = 0;
-        if (abs(target_vy) < DEADZONE_V) target_vy = 0;
-        if (abs(target_omega) < DEADZONE_OMEGA) target_omega = 0;
+        const int STICK_DEADZONE = 10;
+
+        if (abs(lx) < STICK_DEADZONE) lx = 0;
+        if (abs(ly) < STICK_DEADZONE) ly = 0;
+        if (abs(rx) < STICK_DEADZONE) rx = 0;
+
+        double target_vx    = lx / 128.0 * MAXIMUM_TRANSLATIONAL_VELOCITY;
+        double target_vy    = ly / 128.0 * MAXIMUM_TRANSLATIONAL_VELOCITY;
+        double target_omega = rx / 128.0 * MAXIMUM_ROTATIONAL_SPEED;
 
         enc_count1 = enc1.getCount();
         enc_count2 = enc2.getCount();
@@ -117,6 +123,7 @@ void loop() {
         prev2 = enc_count2;
         prev3 = enc_count3;
 
+        // ホイール角速度rad/s
         double wheelSpeed1 = pulseToRad(deltaCount1) / dt;
         double wheelSpeed2 = pulseToRad(deltaCount2) / dt;
         double wheelSpeed3 = pulseToRad(deltaCount3) / dt;
@@ -136,5 +143,14 @@ void loop() {
         setMotor(MOTOR1_CH, PIN_DIR_1, pwm1);
         setMotor(MOTOR2_CH, PIN_DIR_2, pwm2);
         setMotor(MOTOR3_CH, PIN_DIR_3, pwm3);
+
+        if (target_vx == 0 && target_vy == 0 && target_omega == 0) {
+            pwm1 = 0;
+            pwm2 = 0;
+            pwm3 = 0;
+            pid1.reset();
+            pid2.reset();
+            pid3.reset();
+        }
     }
 }

@@ -16,7 +16,7 @@ constexpr int8_t PIN_PWM_2      = 25;
 constexpr int8_t PIN_DIR_2      = 26;
 
 constexpr int8_t PIN_ROTARY_A_3 = 27;
-constexpr int8_t PIN_ROTARY_B_3 = 23;
+constexpr int8_t PIN_ROTARY_B_3 = 23;+
 constexpr int8_t PIN_PWM_3      = 22;
 constexpr int8_t PIN_DIR_3      = 21;
 
@@ -152,5 +152,7 @@ void loop() {
             pid2.reset();
             pid3.reset();
         }
+
+        Serial.println(targetOmega1 - wheelSpeed1);
     }
 }

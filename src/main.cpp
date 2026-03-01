@@ -4,21 +4,26 @@
 #include <SpeedPID.h>
 #include <cmath>
 
+// かいめいさんのろぼ
+// enc1 B 22 A 23
+// enc2 B 25 A 21
+// enc3 B
+
 // ピン配置
-constexpr int8_t PIN_ROTARY_A_1 = 36;
-constexpr int8_t PIN_ROTARY_B_1 = 39;
-constexpr int8_t PIN_PWM_1      = 32;
 constexpr int8_t PIN_DIR_1      = 33;
+constexpr int8_t PIN_PWM_1      = 32;
+constexpr int8_t PIN_ROTARY_A_1 = 13;
+constexpr int8_t PIN_ROTARY_B_1 = 2;
 
-constexpr int8_t PIN_ROTARY_A_2 = 34;
-constexpr int8_t PIN_ROTARY_B_2 = 35;
-constexpr int8_t PIN_PWM_2      = 25;
 constexpr int8_t PIN_DIR_2      = 26;
+constexpr int8_t PIN_PWM_2      = 25;
+constexpr int8_t PIN_ROTARY_A_2 = 21;
+constexpr int8_t PIN_ROTARY_B_2 = 15;
 
-constexpr int8_t PIN_ROTARY_A_3 = 27;
-constexpr int8_t PIN_ROTARY_B_3 = 23;+
-constexpr int8_t PIN_PWM_3      = 22;
-constexpr int8_t PIN_DIR_3      = 21;
+constexpr int8_t PIN_DIR_3      = 14;
+constexpr int8_t PIN_PWM_3      = 27;
+constexpr int8_t PIN_ROTARY_A_3 = 23;
+constexpr int8_t PIN_ROTARY_B_3 = 22;
 
 constexpr int8_t PIN_PWM_ARM        = 19;
 constexpr int8_t PIN_DIR_ARM        = 18;
@@ -30,8 +35,8 @@ ESP32Encoder enc1, enc2, enc3;
 const int    CONTROL_CYCLE = 5000;
 const double RESOLUTION    = 4096.;
 
-constexpr double ROBOT_RADIUS = 0.3;
-constexpr double WHEEL_RADIUS = 0.05;
+constexpr double ROBOT_RADIUS = 0.15;
+constexpr double WHEEL_RADIUS = 0.03;
 
 constexpr double MAXIMUM_TRANSLATIONAL_VELOCITY = 4.;
 constexpr double MAXIMUM_ROTATIONAL_SPEED       = 5.;
@@ -66,7 +71,7 @@ void setMotor(int8_t ch, int8_t dirPin, double pwm) {
 
 void setup() {
     Serial.begin(115200);
-    PS4.begin("48:e7:29:a3:c5:0e");
+    PS4.begin("08:D1:F9:37:41:F2");
     ESP32Encoder::useInternalWeakPullResistors = puType::none;
     enc1.attachHalfQuad(PIN_ROTARY_A_1, PIN_ROTARY_B_1);
     enc2.attachHalfQuad(PIN_ROTARY_A_2, PIN_ROTARY_B_2);
